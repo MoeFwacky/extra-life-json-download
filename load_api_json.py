@@ -53,12 +53,19 @@ def api_call(url,file,etagList): #check extra life API for data, save data to fi
 	for etag in etagList: #loop through stored etags to check the api for changes
 		textline(line(),"Stored etag: "+str(etag))
 		response = requests.get(urlCheck)
-		textline(line(),"Response etag: "+str(response.headers['ETag']))
-		if(response.headers['ETag'] != etag): #if changes is detected, set flag to update
-			needsUpdate = "yes"
-			textline(line(),file[:-5]+" DATA UPDATE DETECTED","\t\t\t\t\t\n")
-		else:
-			textline(line(),"ETAG MATCH FOUND, NO UPDATE NEEDED")
+		try:
+			textline(line(),"Response etag: "+str(response.headers['ETag']))
+			if(response.headers['ETag'] != etag): #if changes is detected, set flag to update
+				needsUpdate = "yes"
+				textline(line(),file[:-5]+" DATA UPDATE DETECTED","\t\t\t\t\t\n")
+			else:
+				textline(line(),"ETAG MATCH FOUND, NO UPDATE NEEDED")			
+		except KeyError as keyerror:
+			textline(line(),str(keyerror))
+			needsUpdate = "no"
+			textline(line(),file[:-5]+" ETAG ERROR: "+str(keyerror)+" SKIPPING UPDATE","\t\t\t\t\t\n")
+			nextPage = "false"
+			break
 		textline(line(),"Checking for Next Page of Results")
 		try: #check headers for link to the next page, if exists
 			urlCheck = response.links['next']['url']		
@@ -106,7 +113,10 @@ def api_call(url,file,etagList): #check extra life API for data, save data to fi
 			loops = loops + 1
 			textline(line(),"LOADING DATA FROM API: "+file[:-5]+", Page "+ str(loops),"\t\t\t\t\n")
 			response = requests.get(url)
-			etagNew.append(response.headers['ETag']) #save new etag
+			try:
+				etagNew.append(response.headers['ETag']) #save new etag
+			except:
+				etagNew.append("ETAGERROR")
 			req = urllib.request.Request( #prepare to grab data from API
 				url, 
 				data=None, 
@@ -120,7 +130,10 @@ def api_call(url,file,etagList): #check extra life API for data, save data to fi
 				teamJSON.extend(newData)
 			else: #if it is the first page, write data to new list
 				textline(line(),"Writing First Page of Data")
-				teamJSON=json.load(urllib.request.urlopen(req))
+				try:
+					teamJSON=json.load(urllib.request.urlopen(req))
+				except urllib.error.HTTPError as httpError:
+					textline(line(),str(httpError))
 			now = datetime.now()
 			changes = 1
 			textline(line(),"needsUpdate="+str(needsUpdate))
@@ -131,7 +144,10 @@ def api_call(url,file,etagList): #check extra life API for data, save data to fi
 						textline(line(),str(response.links['next']['url']))
 				except:
 					trash = "take me out"
-				url = response.links['next']['url']
+				try:
+					url = response.links['next']['url']
+				except KeyError as keyError:
+					textline(line(),"KeyError: "+str(keyError))
 				#sleepForSeconds(rateLimit) #sleeps for set time to avoid overloading the API
 			pages = pages - 1
 #***************************
